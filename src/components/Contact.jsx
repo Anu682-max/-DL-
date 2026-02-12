@@ -1,11 +1,20 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLang } from '../context/LanguageContext';
+import { sanitizeInput, isValidEmail, createRateLimiter, validateLength, hasSuspiciousContent } from '../utils/security';
 
 export default function Contact() {
-  const { t } = useLang();
+  const { lang, t } = useLang();
   const [submitted, setSubmitted] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [formBlocked, setFormBlocked] = useState(false);
   const formRef = useRef(null);
   const infoRef = useRef(null);
+  const submitTimeRef = useRef(0);
+  const formLimiter = useMemo(() => createRateLimiter(3, 300000), []); // 3 submissions per 5 min
+
+  useEffect(() => {
+    submitTimeRef.current = Date.now();
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -16,10 +25,80 @@ export default function Contact() {
     return () => observer.disconnect();
   }, []);
 
+  const validateForm = (data) => {
+    const errs = {};
+    const name = data.get('name')?.trim();
+    const email = data.get('email')?.trim();
+    const message = data.get('message')?.trim();
+
+    if (!validateLength(name, 1, 100)) {
+      errs.name = lang === 'ja' ? '名前を入力してください（100文字以内）' : 'Name is required (max 100 chars)';
+    }
+    if (!email || !isValidEmail(email)) {
+      errs.email = lang === 'ja' ? '有効なメールアドレスを入力してください' : 'Please enter a valid email';
+    }
+    if (!validateLength(message, 10, 2000)) {
+      errs.message = lang === 'ja' ? 'メッセージは10文字以上2000文字以内で入力してください' : 'Message must be 10-2000 characters';
+    }
+
+    // Check all fields for suspicious content
+    for (const [, value] of data.entries()) {
+      if (typeof value === 'string' && hasSuspiciousContent(value)) {
+        errs.suspicious = lang === 'ja' ? '不正な入力が検出されました' : 'Invalid input detected';
+        break;
+      }
+    }
+
+    return errs;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    console.log('Form submitted:', Object.fromEntries(formData));
+
+    // Honeypot check - if hidden field is filled, it's a bot
+    if (formData.get('website_url')) {
+      // Silently pretend success for bots
+      setSubmitted(true);
+      return;
+    }
+
+    // Time-based bot detection - form filled too fast (< 3 seconds)
+    if (Date.now() - submitTimeRef.current < 3000) {
+      setSubmitted(true);
+      return;
+    }
+
+    // Rate limiting
+    if (!formLimiter.canProceed()) {
+      setFormBlocked(true);
+      setErrors({
+        rate: lang === 'ja'
+          ? '送信頻度が高すぎます。しばらくしてからお試しください。'
+          : 'Too many submissions. Please try again later.',
+      });
+      return;
+    }
+
+    // Validate
+    const validationErrors = validateForm(formData);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    // Sanitize all inputs before processing
+    const sanitized = {
+      name: sanitizeInput(formData.get('name')),
+      company: sanitizeInput(formData.get('company') || ''),
+      email: sanitizeInput(formData.get('email')),
+      subject: sanitizeInput(formData.get('subject') || ''),
+      message: sanitizeInput(formData.get('message')),
+    };
+
+    formLimiter.record();
+    console.log('Form submitted (sanitized):', sanitized);
+    setErrors({});
     setSubmitted(true);
   };
 
@@ -39,18 +118,29 @@ export default function Contact() {
                 <p>{t('contact.successMsg')}</p>
               </div>
             ) : (
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit} noValidate>
+                {/* Honeypot - invisible to users, bots fill it */}
+                <div style={{ position: 'absolute', left: '-9999px', opacity: 0, height: 0, overflow: 'hidden' }} aria-hidden="true">
+                  <label htmlFor="website_url">Website</label>
+                  <input type="text" id="website_url" name="website_url" tabIndex={-1} autoComplete="off" />
+                </div>
+
+                {errors.rate && <p className="form-error form-error-global">{errors.rate}</p>}
+                {errors.suspicious && <p className="form-error form-error-global">{errors.suspicious}</p>}
+
                 <div className="form-group">
                   <label htmlFor="name">{t('contact.name')} <span className="required">*</span></label>
-                  <input type="text" id="name" name="name" required placeholder={t('contact.namePh')} />
+                  <input type="text" id="name" name="name" required maxLength={100} placeholder={t('contact.namePh')} />
+                  {errors.name && <p className="form-error">{errors.name}</p>}
                 </div>
                 <div className="form-group">
                   <label htmlFor="company">{t('contact.company')}</label>
-                  <input type="text" id="company" name="company" placeholder={t('contact.companyPh')} />
+                  <input type="text" id="company" name="company" maxLength={100} placeholder={t('contact.companyPh')} />
                 </div>
                 <div className="form-group">
                   <label htmlFor="email">{t('contact.email')} <span className="required">*</span></label>
-                  <input type="email" id="email" name="email" required placeholder="example@email.com" />
+                  <input type="email" id="email" name="email" required maxLength={254} placeholder="example@email.com" />
+                  {errors.email && <p className="form-error">{errors.email}</p>}
                 </div>
                 <div className="form-group">
                   <label htmlFor="subject">{t('contact.subject')}</label>
@@ -64,9 +154,10 @@ export default function Contact() {
                 </div>
                 <div className="form-group">
                   <label htmlFor="message">{t('contact.message')} <span className="required">*</span></label>
-                  <textarea id="message" name="message" rows="6" required placeholder={t('contact.messagePh')}></textarea>
+                  <textarea id="message" name="message" rows="6" required maxLength={2000} placeholder={t('contact.messagePh')}></textarea>
+                  {errors.message && <p className="form-error">{errors.message}</p>}
                 </div>
-                <button type="submit" className="btn btn-primary btn-full">{t('contact.submit')}</button>
+                <button type="submit" className="btn btn-primary btn-full" disabled={formBlocked}>{t('contact.submit')}</button>
               </form>
             )}
           </div>

@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useLang } from '../context/LanguageContext';
 import { sendMessage as sendGemini, initGeminiChat } from '../services/gemini';
+import { sanitizeHTML, sanitizeInput, createRateLimiter, hasSuspiciousContent } from '../utils/security';
 
 const knowledge = {
   ja: {
@@ -101,7 +102,9 @@ export default function ChatWidget() {
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
   const [hasGreeted, setHasGreeted] = useState(false);
+  const [rateLimited, setRateLimited] = useState(false);
   const messagesEndRef = useRef(null);
+  const chatLimiter = useMemo(() => createRateLimiter(10, 60000), []); // 10 messages per minute
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -163,8 +166,36 @@ export default function ChatWidget() {
   };
 
   const handleSend = () => {
-    const text = input.trim();
-    if (!text) return;
+    const raw = input.trim();
+    if (!raw) return;
+    if (raw.length > 500) {
+      setInput(raw.slice(0, 500));
+      return;
+    }
+    // Rate limiting
+    if (!chatLimiter.canProceed()) {
+      setRateLimited(true);
+      const wait = Math.ceil(chatLimiter.getTimeUntilReset() / 1000);
+      setMessages((prev) => [...prev, {
+        sender: 'bot',
+        text: lang === 'ja'
+          ? `メッセージの送信頻度が高すぎます。${wait}秒後にお試しください。`
+          : `Too many messages. Please wait ${wait} seconds.`,
+      }]);
+      setTimeout(() => setRateLimited(false), chatLimiter.getTimeUntilReset());
+      return;
+    }
+    // Suspicious content check
+    if (hasSuspiciousContent(raw)) {
+      setMessages((prev) => [...prev,
+        { sender: 'user', text: sanitizeInput(raw) },
+        { sender: 'bot', text: lang === 'ja' ? '不正な入力が検出されました。' : 'Invalid input detected.' },
+      ]);
+      setInput('');
+      return;
+    }
+    chatLimiter.record();
+    const text = sanitizeInput(raw);
     setMessages((prev) => [...prev, { sender: 'user', text }]);
     setInput('');
     askAI(text);
@@ -217,7 +248,7 @@ export default function ChatWidget() {
                 <div className="chat-msg-avatar">{msg.sender === 'bot' ? 'DL' : '👤'}</div>
                 <div
                   className="chat-msg-bubble"
-                  dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g, '<br>') }}
+                  dangerouslySetInnerHTML={{ __html: msg.sender === 'user' ? sanitizeInput(msg.text) : sanitizeHTML(msg.text) }}
                 />
               </div>
             );
@@ -241,7 +272,8 @@ export default function ChatWidget() {
             className="chat-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+            maxLength={500}
             placeholder={lang === 'ja' ? 'メッセージを入力...' : 'Type a message...'}
           />
           <button className="chat-send" onClick={handleSend} aria-label="Send">
