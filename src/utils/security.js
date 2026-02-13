@@ -3,25 +3,29 @@
 // ============================
 
 /**
- * Sanitize HTML to prevent XSS attacks.
- * Allows only safe tags: b, i, br, strong, em, a (with href)
+ * Convert markdown to safe HTML for AI bot responses
  */
-export function sanitizeHTML(html) {
+export function sanitizeHTML(text) {
+  if (typeof text !== 'string') return '';
+
+  // 1. Escape dangerous HTML characters first
   const div = document.createElement('div');
-  div.textContent = html;
+  div.textContent = text;
   let safe = div.innerHTML;
 
-  // Restore allowed tags
+  // 2. Convert markdown to HTML
   safe = safe
-    .replace(/&lt;b&gt;/gi, '<b>')
-    .replace(/&lt;\/b&gt;/gi, '</b>')
-    .replace(/&lt;i&gt;/gi, '<i>')
-    .replace(/&lt;\/i&gt;/gi, '</i>')
-    .replace(/&lt;strong&gt;/gi, '<strong>')
-    .replace(/&lt;\/strong&gt;/gi, '</strong>')
-    .replace(/&lt;em&gt;/gi, '<em>')
-    .replace(/&lt;\/em&gt;/gi, '</em>')
-    .replace(/&lt;br\s*\/?&gt;/gi, '<br>')
+    // **bold** → <b>bold</b>
+    .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+    // *italic* → <i>italic</i>
+    .replace(/\*(.+?)\*/g, '<i>$1</i>')
+    // ### heading → <b>heading</b>
+    .replace(/^#{1,3}\s+(.+)$/gm, '<b>$1</b>')
+    // - list item → • item
+    .replace(/^[-•]\s+(.+)$/gm, '• $1')
+    // numbered list: 1. item → keep as is
+    .replace(/^\d+\.\s+(.+)$/gm, '$1')
+    // newlines → <br>
     .replace(/\n/g, '<br>');
 
   return safe;
