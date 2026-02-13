@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0f3fa8"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <clipPath id="c"><rect width="48" height="48" rx="12"/></clipPath>
+  </defs>
+  <rect width="48" height="48" rx="12" fill="url(#bg)"/>
+  <g clip-path="url(#c)">
+    <path d="M-2 34 C4 29 10 39 16 34 C22 29 28 39 34 34 C40 29 46 39 52 34 L52 50 L-2 50 Z" fill="#60a5fa" opacity="0.5"/>
+    <path d="M-2 38 C4 34 10 43 16 38 C22 34 28 43 34 38 C40 34 46 43 52 38 L52 50 L-2 50 Z" fill="white" opacity="0.2"/>
+  </g>
+  <text x="5" y="29" font-family="Arial Black,sans-serif" font-weight="900" font-size="20" fill="white" letter-spacing="-1">DL</text>
+</svg>
