@@ -105,27 +105,9 @@ body {
     color: var(--primary);
 }
 
-.logo-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    background: var(--gradient-primary);
-    color: #fff;
-    font-weight: 800;
-    font-size: 15px;
-    border-radius: 12px;
-    letter-spacing: 1px;
-    position: relative;
-    overflow: hidden;
-}
-
-.logo-icon::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent);
+.logo svg {
+    flex-shrink: 0;
+    border-radius: 10px;
 }
 
 .logo-text {
@@ -958,9 +940,6 @@ body {
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.footer .logo-icon {
-    background: var(--gradient-primary);
-}
 
 .footer .logo-text {
     color: #fff;

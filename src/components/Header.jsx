@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLang } from '../context/LanguageContext';
+import LogoIcon from './LogoIcon';
 
 export default function Header() {
   const { lang, toggleLang, t } = useLang();
@@ -30,7 +31,7 @@ export default function Header() {
     <header className={`header ${scrolled ? 'scrolled' : ''}`}>
       <div className="container">
         <a href="#" className="logo" onClick={(e) => handleNav(e, 'home')}>
-          <span className="logo-icon">DL</span>
+          <LogoIcon size={40} />
           <span className="logo-text">株式会社DLシステム海</span>
         </a>
         <nav className={`nav ${menuOpen ? 'open' : ''}`}>

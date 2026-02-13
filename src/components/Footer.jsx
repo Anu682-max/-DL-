@@ -1,4 +1,5 @@
 import { useLang } from '../context/LanguageContext';
+import LogoIcon from './LogoIcon';
 
 export default function Footer() {
   const { t } = useLang();
@@ -22,7 +23,7 @@ export default function Footer() {
         <div className="footer-content">
           <div className="footer-brand">
             <a href="#" className="logo" onClick={(e) => scrollTo(e, 'home')}>
-              <span className="logo-icon">DL</span>
+              <LogoIcon size={36} />
               <span className="logo-text">株式会社DLシステム海</span>
             </a>
             <p className="footer-desc">{t('footer.slogan')}</p>
