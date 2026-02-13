@@ -3,10 +3,12 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "routes": [
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
     { "src": "/sitemap.xml", "dest": "/sitemap.xml" },
     { "src": "/robots.txt", "dest": "/robots.txt" },
     { "src": "/favicon.svg", "dest": "/favicon.svg" },
     { "src": "/googled7cf074c5a17035f.html", "dest": "/googled7cf074c5a17035f.html" },
+    { "src": "/(.*\\.(js|css|png|svg|ico|json|woff|woff2|ttf))", "dest": "/$1" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
