@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 
 const SYSTEM_PROMPT = `あなたは「株式会社DLシステム海」の公式AIアシスタントです。お客様からの質問に丁寧に回答してください。
 
@@ -31,53 +31,56 @@ const SYSTEM_PROMPT = `あなたは「株式会社DLシステム海」の公式A
 - 会社と関係ない質問にも親切に対応しつつ、サービスの紹介につなげてください
 `;
 
-let chatSession = null;
+let groqClient = null;
+const messageHistory = [];
 
 export async function initGeminiChat() {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
   if (!apiKey) {
-    console.warn('Gemini API key not found. Set VITE_GEMINI_API_KEY in .env');
+    console.warn('Groq API key not found. Set VITE_GROQ_API_KEY in .env');
     return null;
   }
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
-    systemInstruction: SYSTEM_PROMPT,
+  groqClient = new Groq({
+    apiKey,
+    dangerouslyAllowBrowser: true,
   });
 
-  chatSession = model.startChat({
-    generationConfig: {
-      temperature: 0.7,
-      topP: 0.9,
-      maxOutputTokens: 500,
-    },
-  });
-
-  return chatSession;
+  messageHistory.length = 0;
+  return groqClient;
 }
 
-export async function sendMessage(text, retries = 1) {
-  if (!chatSession) {
+export async function sendMessage(text) {
+  if (!groqClient) {
     await initGeminiChat();
   }
 
-  if (!chatSession) {
-    return null; // API key not set, fallback to local responses
+  if (!groqClient) {
+    return null;
   }
 
+  messageHistory.push({ role: 'user', content: text });
+
   try {
-    const result = await chatSession.sendMessage(text);
-    return result.response.text();
-  } catch (error) {
-    // Retry once on 429 rate limit errors
-    if (retries > 0 && error?.message?.includes('429')) {
-      const delay = parseInt(error.message.match(/retry in ([\d.]+)s/i)?.[1] || '12') * 1000;
-      console.warn(`Gemini rate limited. Retrying in ${delay / 1000}s...`);
-      await new Promise((r) => setTimeout(r, delay));
-      return sendMessage(text, retries - 1);
+    const completion = await groqClient.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        ...messageHistory,
+      ],
+      max_tokens: 500,
+      temperature: 0.7,
+    });
+
+    const reply = completion.choices[0]?.message?.content || null;
+    if (reply) {
+      messageHistory.push({ role: 'assistant', content: reply });
+      if (messageHistory.length > 20) messageHistory.splice(0, 2);
     }
-    console.error('Gemini API error:', error);
-    return null; // fallback to local responses on error
+    return reply;
+  } catch (error) {
+    console.error('Groq API error:', error);
+    messageHistory.pop();
+    return null;
   }
 }
