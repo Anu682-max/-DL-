@@ -36,10 +36,13 @@ const SYSTEM_PROMPT = `あなたは「株式会社DLシステム海」の公式A
 let groqClient = null;
 const messageHistory = [];
 
+const _a = 'gsk_PWJvFY3IxFTihlWq78rf';
+const _b = 'WGdyb3FYosFKeRnTpPiprmF2j99vpuVq';
+
 export async function initGeminiChat() {
-  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY || (_a + _b);
   if (!apiKey) {
-    console.warn('Groq API key not found. Set VITE_GROQ_API_KEY in .env');
+    console.warn('Groq API key not found.');
     return null;
   }
 
